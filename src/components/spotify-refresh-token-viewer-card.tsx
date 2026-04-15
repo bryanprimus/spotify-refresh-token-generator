@@ -43,60 +43,35 @@ export const SpotifyRefreshTokenViewerCard = ({
   const [isCopiedAccessToken, setIsCopiedAccessToken] = useState(false);
   const [isCopiedRefreshToken, setIsCopiedRefreshToken] = useState(false);
 
-  const copyTextToClipboard = async (text: string) => {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(text);
-      return;
-    }
-
-    const textarea = document.createElement("textarea");
-    textarea.value = text;
-    textarea.setAttribute("readonly", "true");
-    textarea.style.position = "fixed";
-    textarea.style.opacity = "0";
-    document.body.appendChild(textarea);
-
-    try {
-      textarea.select();
-      const isCopied = document.execCommand("copy");
-
-      if (!isCopied) {
-        throw new Error("Unable to copy text to clipboard");
-      }
-    } finally {
-      document.body.removeChild(textarea);
-    }
-  };
-
   const copyAccessTokenToClipboard = async (text: string) => {
     try {
-      await copyTextToClipboard(text);
+      await navigator.clipboard.writeText(text);
       setIsCopiedAccessToken(true);
       toast.success("Access token copied to clipboard");
       setTimeout(() => setIsCopiedAccessToken(false), 2000);
     } catch {
-      toast.error("Unable to copy access token");
+      toast.error("Failed to copy", { description: "Clipboard access was denied." });
     }
   };
 
   const copyRefreshTokenToClipboard = async (text: string) => {
     try {
-      await copyTextToClipboard(text);
+      await navigator.clipboard.writeText(text);
       setIsCopiedRefreshToken(true);
       toast.success("Refresh token copied to clipboard");
       setTimeout(() => setIsCopiedRefreshToken(false), 2000);
     } catch {
-      toast.error("Unable to copy refresh token");
+      toast.error("Failed to copy", { description: "Clipboard access was denied." });
     }
   };
 
   const copyAllAsJson = async (data: object) => {
     try {
       const json = JSON.stringify(data, null, 2);
-      await copyTextToClipboard(json);
+      await navigator.clipboard.writeText(json);
       toast.success("JSON copied to clipboard");
     } catch {
-      toast.error("Unable to copy JSON");
+      toast.error("Failed to copy", { description: "Clipboard access was denied." });
     }
   };
 
@@ -134,20 +109,35 @@ export const SpotifyRefreshTokenViewerCard = ({
     })
       .then((response) => response.json())
       .then((data) => {
-        const parsedData = spotifyApiTokenResponseSchema.parse(data);
+        const parsedData = spotifyApiTokenResponseSchema.safeParse(data);
+
+        if (!parsedData.success) {
+          toast.error("Failed to parse Spotify token response", {
+            description: data?.error_description ?? data?.error ?? "Unexpected response from Spotify",
+          });
+          router.replace("/");
+          return;
+        }
+
         toast.success("Spotify API Token Response", {
           description: "Refresh Token has been generated",
         });
 
-        setSpotifyApiTokenResponse(parsedData);
-      })
-      .finally(() => {
+        setSpotifyApiTokenResponse(parsedData.data);
+
         localStorage.removeItem("spotify_client_id");
         localStorage.removeItem("spotify_client_secret");
         localStorage.removeItem("redirect_uri");
 
         const newUrl = window.location.origin + window.location.pathname;
         window.history.replaceState(null, "", newUrl);
+      })
+      .catch((error) => {
+        console.error("Failed to fetch Spotify token:", error);
+        toast.error("Failed to fetch token", {
+          description: "A network error occurred. Please try again.",
+        });
+        router.replace("/");
       });
   }, [code]);
 
@@ -246,19 +236,13 @@ export const SpotifyRefreshTokenViewerCard = ({
       </CardContent>
       <CardFooter className="flex-col gap-4">
         <Button
-          type="button"
           onClick={() => copyAllAsJson(spotifyApiTokenResponse)}
           className="w-full"
         >
           Copy All as JSON
         </Button>
 
-        <Button
-          type="button"
-          variant="secondary"
-          onClick={goBack}
-          className="w-full"
-        >
+        <Button variant="secondary" onClick={goBack} className="w-full">
           Regenerate Refresh Token
         </Button>
       </CardFooter>
