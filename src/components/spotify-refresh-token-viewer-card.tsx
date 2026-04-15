@@ -43,24 +43,36 @@ export const SpotifyRefreshTokenViewerCard = ({
   const [isCopiedAccessToken, setIsCopiedAccessToken] = useState(false);
   const [isCopiedRefreshToken, setIsCopiedRefreshToken] = useState(false);
 
-  const copyAccessTokenToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setIsCopiedAccessToken(true);
-    toast.success("Access token copied to clipboard");
-    setTimeout(() => setIsCopiedAccessToken(false), 2000);
+  const copyAccessTokenToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setIsCopiedAccessToken(true);
+      toast.success("Access token copied to clipboard");
+      setTimeout(() => setIsCopiedAccessToken(false), 2000);
+    } catch {
+      toast.error("Failed to copy", { description: "Clipboard access was denied." });
+    }
   };
 
-  const copyRefreshTokenToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setIsCopiedRefreshToken(true);
-    toast.success("Refresh token copied to clipboard");
-    setTimeout(() => setIsCopiedRefreshToken(false), 2000);
+  const copyRefreshTokenToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      setIsCopiedRefreshToken(true);
+      toast.success("Refresh token copied to clipboard");
+      setTimeout(() => setIsCopiedRefreshToken(false), 2000);
+    } catch {
+      toast.error("Failed to copy", { description: "Clipboard access was denied." });
+    }
   };
 
-  const copyAllAsJson = (data: object) => {
-    const json = JSON.stringify(data, null, 2);
-    navigator.clipboard.writeText(json);
-    toast.success("JSON copied to clipboard");
+  const copyAllAsJson = async (data: object) => {
+    try {
+      const json = JSON.stringify(data, null, 2);
+      await navigator.clipboard.writeText(json);
+      toast.success("JSON copied to clipboard");
+    } catch {
+      toast.error("Failed to copy", { description: "Clipboard access was denied." });
+    }
   };
 
   const goBack = () => {
@@ -97,20 +109,35 @@ export const SpotifyRefreshTokenViewerCard = ({
     })
       .then((response) => response.json())
       .then((data) => {
-        const parsedData = spotifyApiTokenResponseSchema.parse(data);
+        const parsedData = spotifyApiTokenResponseSchema.safeParse(data);
+
+        if (!parsedData.success) {
+          toast.error("Failed to parse Spotify token response", {
+            description: data?.error_description ?? data?.error ?? "Unexpected response from Spotify",
+          });
+          router.replace("/");
+          return;
+        }
+
         toast.success("Spotify API Token Response", {
           description: "Refresh Token has been generated",
         });
 
-        setSpotifyApiTokenResponse(parsedData);
-      })
-      .finally(() => {
+        setSpotifyApiTokenResponse(parsedData.data);
+
         localStorage.removeItem("spotify_client_id");
         localStorage.removeItem("spotify_client_secret");
         localStorage.removeItem("redirect_uri");
 
         const newUrl = window.location.origin + window.location.pathname;
         window.history.replaceState(null, "", newUrl);
+      })
+      .catch((error) => {
+        console.error("Failed to fetch Spotify token:", error);
+        toast.error("Failed to fetch token", {
+          description: "A network error occurred. Please try again.",
+        });
+        router.replace("/");
       });
   }, [code]);
 
@@ -138,6 +165,7 @@ export const SpotifyRefreshTokenViewerCard = ({
               className="flex-grow font-mono text-sm"
             />
             <Button
+              type="button"
               size="icon"
               variant="outline"
               onClick={() =>
@@ -164,11 +192,12 @@ export const SpotifyRefreshTokenViewerCard = ({
               className="flex-grow font-mono text-sm"
             />
             <Button
+              type="button"
               size="icon"
               variant="outline"
               onClick={() =>
                 copyRefreshTokenToClipboard(
-                  spotifyApiTokenResponse.access_token
+                  spotifyApiTokenResponse.refresh_token
                 )
               }
               title="Copy refresh token"
