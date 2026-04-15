@@ -55,9 +55,17 @@ export const SpotifyRefreshTokenViewerCard = ({
     textarea.style.position = "fixed";
     textarea.style.opacity = "0";
     document.body.appendChild(textarea);
-    textarea.select();
-    document.execCommand("copy");
-    document.body.removeChild(textarea);
+
+    try {
+      textarea.select();
+      const isCopied = document.execCommand("copy");
+
+      if (!isCopied) {
+        throw new Error("Unable to copy text to clipboard");
+      }
+    } finally {
+      document.body.removeChild(textarea);
+    }
   };
 
   const copyAccessTokenToClipboard = async (text: string) => {
