@@ -43,24 +43,53 @@ export const SpotifyRefreshTokenViewerCard = ({
   const [isCopiedAccessToken, setIsCopiedAccessToken] = useState(false);
   const [isCopiedRefreshToken, setIsCopiedRefreshToken] = useState(false);
 
-  const copyAccessTokenToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setIsCopiedAccessToken(true);
-    toast.success("Access token copied to clipboard");
-    setTimeout(() => setIsCopiedAccessToken(false), 2000);
+  const copyTextToClipboard = async (text: string) => {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+      return;
+    }
+
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.setAttribute("readonly", "true");
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.appendChild(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    document.body.removeChild(textarea);
   };
 
-  const copyRefreshTokenToClipboard = (text: string) => {
-    navigator.clipboard.writeText(text);
-    setIsCopiedRefreshToken(true);
-    toast.success("Refresh token copied to clipboard");
-    setTimeout(() => setIsCopiedRefreshToken(false), 2000);
+  const copyAccessTokenToClipboard = async (text: string) => {
+    try {
+      await copyTextToClipboard(text);
+      setIsCopiedAccessToken(true);
+      toast.success("Access token copied to clipboard");
+      setTimeout(() => setIsCopiedAccessToken(false), 2000);
+    } catch {
+      toast.error("Unable to copy access token");
+    }
   };
 
-  const copyAllAsJson = (data: object) => {
-    const json = JSON.stringify(data, null, 2);
-    navigator.clipboard.writeText(json);
-    toast.success("JSON copied to clipboard");
+  const copyRefreshTokenToClipboard = async (text: string) => {
+    try {
+      await copyTextToClipboard(text);
+      setIsCopiedRefreshToken(true);
+      toast.success("Refresh token copied to clipboard");
+      setTimeout(() => setIsCopiedRefreshToken(false), 2000);
+    } catch {
+      toast.error("Unable to copy refresh token");
+    }
+  };
+
+  const copyAllAsJson = async (data: object) => {
+    try {
+      const json = JSON.stringify(data, null, 2);
+      await copyTextToClipboard(json);
+      toast.success("JSON copied to clipboard");
+    } catch {
+      toast.error("Unable to copy JSON");
+    }
   };
 
   const goBack = () => {
@@ -138,6 +167,7 @@ export const SpotifyRefreshTokenViewerCard = ({
               className="flex-grow font-mono text-sm"
             />
             <Button
+              type="button"
               size="icon"
               variant="outline"
               onClick={() =>
@@ -164,11 +194,12 @@ export const SpotifyRefreshTokenViewerCard = ({
               className="flex-grow font-mono text-sm"
             />
             <Button
+              type="button"
               size="icon"
               variant="outline"
               onClick={() =>
                 copyRefreshTokenToClipboard(
-                  spotifyApiTokenResponse.access_token
+                  spotifyApiTokenResponse.refresh_token
                 )
               }
               title="Copy refresh token"
@@ -207,13 +238,19 @@ export const SpotifyRefreshTokenViewerCard = ({
       </CardContent>
       <CardFooter className="flex-col gap-4">
         <Button
+          type="button"
           onClick={() => copyAllAsJson(spotifyApiTokenResponse)}
           className="w-full"
         >
           Copy All as JSON
         </Button>
 
-        <Button variant="secondary" onClick={goBack} className="w-full">
+        <Button
+          type="button"
+          variant="secondary"
+          onClick={goBack}
+          className="w-full"
+        >
           Regenerate Refresh Token
         </Button>
       </CardFooter>
